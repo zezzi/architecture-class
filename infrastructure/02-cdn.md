@@ -39,7 +39,14 @@ The platform serves media-heavy content. Coaches upload workout videos (potentia
 ### How It Fits
 
 **Approach A -- Modular Monolith:**
-The CDN sits in front of the monolith's static file routes and object storage (S3). The monolith generates pre-signed URLs for private content (client progress photos, paid workout plans) and the CDN caches public content (marketing pages, free workout thumbnails). Configuration is straightforward because there is one origin.
+The CDN is the first thing a client request hits. It sits in front of everything -- the API Gateway, the Load Balancer, and the application. Static assets (JS, CSS, images, videos) are served directly from the edge without touching the origin. Only dynamic API requests (`/api/*`) pass through to the API Gateway.
+
+```
+Client --> CDN --> (static? serve from edge cache)
+               --> (dynamic? forward to API Gateway --> Load Balancer --> Monolith)
+```
+
+The monolith generates pre-signed URLs for private content (client progress photos, paid workout plans) and the CDN caches public content (marketing pages, free workout thumbnails). Configuration is straightforward because there is one origin.
 
 **Approach B -- Microservices:**
 The CDN still has one primary origin (typically the API Gateway or a dedicated static file server), but cache rules may vary by path. `/static/*` has long TTLs, `/api/*` is marked as uncacheable. Video content served from S3 has its own CloudFront distribution with specific cache behaviors. Each service that generates static artifacts (e.g., PDF reports from the Reporting Service) pushes them to S3, and the CDN serves them from there.

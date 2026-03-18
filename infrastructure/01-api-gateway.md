@@ -43,18 +43,18 @@ The gateway protects sensitive endpoints (payment webhooks, coach dashboards, cl
 ### How It Fits
 
 **Approach A -- Modular Monolith:**
-The gateway has a single upstream target -- the monolith process. Routing is simple: every request goes to the same host and port. The gateway still earns its keep through rate limiting, JWT validation, CORS, and versioning. Internal module routing (e.g., deciding whether a request hits the Scheduling module or the Payments module) happens inside the monolith's own router.
+The gateway has a single upstream target -- the load balancer in front of the monolith instances. Routing is simple: every API request goes to the same host and port. The gateway still earns its keep through rate limiting, JWT validation, CORS, and versioning. Internal module routing (e.g., deciding whether a request hits the Scheduling module or the Payments module) happens inside the monolith's own router.
 
 ```
-Client --> API Gateway --> Monolith (internal router dispatches to modules)
+Client --> CDN (static assets) --> API Gateway --> Load Balancer --> Monolith
 ```
 
 **Approach B -- Microservices:**
 The gateway becomes essential for routing. `/api/v1/workouts` goes to the Workout Service, `/api/v1/payments` goes to the Payment Service, `/api/v1/coaches` goes to the Coach Service. The gateway maintains a routing table (often auto-discovered via Kubernetes service names or Consul). It may also perform request aggregation -- a single client call to `/api/v1/dashboard` might fan out to three services internally.
 
 ```
-Client --> API Gateway --> Workout Service
-                      --> Payment Service
-                      --> Coach Service
-                      --> Notification Service
+Client --> CDN (static assets) --> API Gateway --> Workout Service
+                                               --> Payment Service
+                                               --> Coach Service
+                                               --> Notification Service
 ```

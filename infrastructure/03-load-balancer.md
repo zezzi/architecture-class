@@ -42,16 +42,16 @@ A single application instance cannot handle unlimited traffic. When the platform
 The load balancer sits in front of N identical instances of the monolith. All instances run the same code and connect to the same database. Scaling is simple: add more instances behind the load balancer. A typical setup uses 2-4 instances for redundancy and scales to 8-12 during peak hours (e.g., Monday morning when everyone books their weekly sessions).
 
 ```
-API Gateway --> Load Balancer --> Monolith Instance 1
-                              --> Monolith Instance 2
-                              --> Monolith Instance 3
+Client --> CDN --> API Gateway --> Load Balancer --> Monolith Instance 1
+                                                --> Monolith Instance 2
+                                                --> Monolith Instance 3
 ```
 
 **Approach B -- Microservices:**
 Each service has its own load balancer (or a shared one with path-based routing rules). The Workout Service might run 4 instances, the Payment Service runs 2 (lower traffic but higher criticality), and the Notification Service runs 6 during campaign blasts. Kubernetes typically handles this via internal Services and Ingress controllers, abstracting the load balancer per service.
 
 ```
-API Gateway --> LB (Workout) --> Workout Instance 1, 2, 3, 4
-            --> LB (Payment) --> Payment Instance 1, 2
-            --> LB (Notify)  --> Notification Instance 1, 2, 3, 4, 5, 6
+Client --> CDN --> API Gateway --> LB (Workout) --> Workout Instance 1, 2, 3, 4
+                               --> LB (Payment) --> Payment Instance 1, 2
+                               --> LB (Notify)  --> Notification Instance 1, 2, 3, 4, 5, 6
 ```
