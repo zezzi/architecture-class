@@ -70,3 +70,11 @@ A 55-slide architecture review covering all major topics:
 - [presentation.md](./presentation.md) — Marp source (editable)
 - [05-presentation-part1.md](./05-presentation-part1.md) — Slides 1–28 with speaker notes
 - [06-presentation-part2.md](./06-presentation-part2.md) — Slides 29–55 with speaker notes
+
+### Infrastructure Components Presentation
+
+A 30-slide deep dive into every infrastructure component — API Gateway, CDN, Redis, Kafka, PostgreSQL, S3, Auth0, Stripe, and more:
+
+- [infrastructure-presentation.pptx](./infrastructure-presentation.pptx) — PowerPoint format
+- [infrastructure-presentation.html](./infrastructure-presentation.html) — Browser presentation
+- [infrastructure-presentation.md](./infrastructure-presentation.md) — Marp source (editable)

@@ -1,75 +1,144 @@
-# Diagram 2: DDD Bounded Context Map
+# DDD Bounded Context Map
 
-This diagram shows all 12 bounded contexts and the strategic DDD relationships between them. Arrows indicate upstream-to-downstream dependency direction. Labels on the edges describe the integration pattern used: ACL (Anti-Corruption Layer), CF (Conformist), SK (Shared Kernel), OHS (Open Host Service), or PL (Published Language).
+The 12 bounded contexts are split into three domain types. Each diagram below focuses on one set of relationships so the connections are readable.
+
+---
+
+## Domain Classification
+
+```mermaid
+graph TB
+    subgraph Core["Core Domain — Competitive Advantage"]
+        Coaching["Coaching"]
+        Programs["Programs"]
+    end
+
+    subgraph Supporting["Supporting Domain"]
+        Scheduling["Scheduling"]
+        Communication["Communication"]
+        Content["Content"]
+        Video["Video Sessions"]
+        Support["Support"]
+    end
+
+    subgraph Generic["Generic Domain"]
+        Identity["Identity & Access"]
+        Payments["Payments"]
+        Notifications["Notifications"]
+        Analytics["Analytics"]
+        Search["Search"]
+    end
+
+    style Core fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    style Supporting fill:#bbdefb,stroke:#1565c0,stroke-width:2px
+    style Generic fill:#ffe0b2,stroke:#e65100,stroke-width:2px
+```
+
+---
+
+## Identity — Upstream to Everything
+
+Identity & Access is the authority for user data. All other contexts depend on it.
 
 ```mermaid
 graph LR
-    subgraph CoreDomain["Core Domain"]
-        Coaching["Coaching<br/>(Core)<br/>---<br/>Coach profiles,<br/>client relationships,<br/>goals, assessments"]
-        Programs["Programs<br/>(Core)<br/>---<br/>Workout plans,<br/>nutrition plans,<br/>progress tracking"]
-    end
+    Identity["Identity & Access<br/>Users, Roles, Permissions"]
 
-    subgraph SupportingDomain["Supporting Domain"]
-        Scheduling["Scheduling<br/>(Supporting)<br/>---<br/>Bookings, availability,<br/>calendar management"]
-        Communication["Communication<br/>(Supporting)<br/>---<br/>Chat, messaging,<br/>file sharing"]
-        Content["Content<br/>(Supporting)<br/>---<br/>Exercise library,<br/>articles, media"]
-        VideoSessions["Video Sessions<br/>(Supporting)<br/>---<br/>Live sessions,<br/>recordings"]
-        Support["Support<br/>(Supporting)<br/>---<br/>Tickets, FAQ,<br/>dispute resolution"]
-    end
+    Identity -->|"OHS/PL<br/>JWT claims"| Coaching["Coaching"]
+    Identity -->|"OHS/PL"| Scheduling["Scheduling"]
+    Identity -->|"OHS/PL"| Payments["Payments"]
+    Identity -->|"OHS/PL"| Communication["Communication"]
+    Identity -->|"OHS/PL"| Programs["Programs"]
+    Identity -->|"OHS/PL"| Support["Support"]
 
-    subgraph GenericDomain["Generic Domain"]
-        Identity["Identity & Access<br/>(Generic)<br/>---<br/>Users, roles,<br/>permissions, auth"]
-        Payments["Payments<br/>(Generic)<br/>---<br/>Subscriptions, invoices,<br/>refunds, payouts"]
-        Notifications["Notifications<br/>(Generic)<br/>---<br/>Email, SMS, push,<br/>in-app alerts"]
-        Analytics["Analytics<br/>(Generic)<br/>---<br/>Events, metrics,<br/>reports, dashboards"]
-        Search["Search<br/>(Generic)<br/>---<br/>Full-text search,<br/>filters, ranking"]
-    end
-
-    Identity -->|"OHS/PL<br/>User identity shared<br/>via JWT claims"| Coaching
-    Identity -->|"OHS/PL"| Scheduling
-    Identity -->|"OHS/PL"| Payments
-    Identity -->|"OHS/PL"| Communication
-    Identity -->|"OHS/PL"| Programs
-    Identity -->|"OHS/PL"| Support
-
-    Coaching -->|"SK<br/>Shared Kernel:<br/>CoachId, ClientId"| Programs
-    Coaching -->|"OHS/PL<br/>Coach availability<br/>published"| Scheduling
-    Coaching -->|"OHS/PL<br/>Coach/Client pairs<br/>published"| Communication
-    Coaching -->|"OHS/PL"| VideoSessions
-
-    Programs -->|"OHS/PL<br/>Exercise references"| Content
-    Programs -->|"CF<br/>Conformist:<br/>adopts program model"| Analytics
-
-    Scheduling -->|"ACL<br/>Anti-Corruption Layer:<br/>translates booking<br/>to payment request"| Payments
-    Scheduling -->|"OHS/PL<br/>Booking events<br/>published"| Notifications
-    Scheduling -->|"OHS/PL"| VideoSessions
-    Scheduling -->|"CF"| Analytics
-
-    Payments -->|"ACL<br/>Wraps Stripe API"| Notifications
-    Payments -->|"CF"| Analytics
-
-    Communication -->|"OHS/PL<br/>Message events"| Notifications
-    Communication -->|"CF"| Analytics
-
-    VideoSessions -->|"ACL<br/>Wraps Zoom API"| Notifications
-    VideoSessions -->|"CF"| Analytics
-
-    Content -->|"OHS/PL<br/>Content indexed"| Search
-    Coaching -->|"OHS/PL<br/>Coach profiles indexed"| Search
-    Programs -->|"OHS/PL<br/>Programs indexed"| Search
-
-    Support -->|"ACL"| Payments
-    Support -->|"CF"| Analytics
-    Support -->|"OHS/PL"| Notifications
-
-    Notifications -->|"CF"| Analytics
-
-    style CoreDomain fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
-    style SupportingDomain fill:#bbdefb,stroke:#1565c0,stroke-width:2px
-    style GenericDomain fill:#ffe0b2,stroke:#e65100,stroke-width:2px
+    style Identity fill:#ffe0b2,stroke:#e65100,stroke-width:2px
 ```
 
-**Relationship Legend:**
+---
+
+## Core Domain Relationships
+
+Coaching and Programs are the platform's core value. They feed data to Scheduling, Communication, Content, Search, and Video.
+
+```mermaid
+graph LR
+    Coaching["Coaching<br/>Profiles, Services"]
+    Programs["Programs<br/>Workout Plans, Progress"]
+
+    Coaching -->|"SK<br/>CoachId, ClientId"| Programs
+    Coaching -->|"OHS/PL<br/>Availability"| Scheduling["Scheduling"]
+    Coaching -->|"OHS/PL<br/>Coach/Client pairs"| Communication["Communication"]
+    Coaching -->|"OHS/PL"| Video["Video Sessions"]
+    Coaching -->|"OHS/PL<br/>Profiles indexed"| Search["Search"]
+
+    Programs -->|"OHS/PL<br/>Exercise refs"| Content["Content"]
+    Programs -->|"OHS/PL<br/>Programs indexed"| Search
+
+    style Coaching fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    style Programs fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+```
+
+---
+
+## Scheduling & Payments Flow
+
+Scheduling creates bookings. Payments processes charges. Events flow to Notifications and Analytics.
+
+```mermaid
+graph LR
+    Scheduling["Scheduling<br/>Bookings, Availability"]
+    Payments["Payments<br/>Charges, Subscriptions"]
+
+    Scheduling -->|"ACL<br/>Booking → Payment"| Payments
+    Scheduling -->|"OHS/PL<br/>Booking events"| Notifications["Notifications"]
+    Scheduling -->|"OHS/PL"| Video["Video Sessions"]
+    Scheduling -->|"CF"| Analytics["Analytics"]
+
+    Payments -->|"ACL<br/>Wraps Stripe"| Notifications
+    Payments -->|"CF"| Analytics
+
+    style Scheduling fill:#bbdefb,stroke:#1565c0,stroke-width:2px
+    style Payments fill:#ffe0b2,stroke:#e65100,stroke-width:2px
+```
+
+---
+
+## Event Consumers — Notifications, Analytics, Search
+
+These three contexts consume events from nearly every other context.
+
+```mermaid
+graph RL
+    Notifications["Notifications<br/>Email, SMS, Push"]
+    Analytics["Analytics<br/>Metrics, Reports"]
+    Search["Search<br/>Full-text Index"]
+
+    Scheduling["Scheduling"] --> Notifications
+    Payments["Payments"] --> Notifications
+    Communication["Communication"] --> Notifications
+    Video["Video Sessions"] --> Notifications
+    Support["Support"] --> Notifications
+
+    Scheduling --> Analytics
+    Payments --> Analytics
+    Programs["Programs"] --> Analytics
+    Communication --> Analytics
+    Video --> Analytics
+    Support --> Analytics
+    Notifications --> Analytics
+
+    Coaching["Coaching"] --> Search
+    Content["Content"] --> Search
+    Programs --> Search
+
+    style Notifications fill:#ffe0b2,stroke:#e65100,stroke-width:2px
+    style Analytics fill:#ffe0b2,stroke:#e65100,stroke-width:2px
+    style Search fill:#ffe0b2,stroke:#e65100,stroke-width:2px
+```
+
+---
+
+## Relationship Legend
 
 | Pattern | Abbreviation | Description |
 |---|---|---|

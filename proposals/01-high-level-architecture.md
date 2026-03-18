@@ -27,102 +27,49 @@ This section contrasts two architectural approaches for the platform. **Approach
 - RabbitMQ handles the cases where true async decoupling matters: notifications, analytics, search indexing.
 - Extracting a module into its own service later requires only lifting the module directory, pointing it at its own schema, and replacing in-process calls with HTTP/gRPC.
 
+**Application Layer:**
+
 ```mermaid
 graph TB
-    subgraph "Client Layer"
-        WEB[Web App - React/Next.js]
-        MOBILE[Mobile App - React Native]
-        ADMIN[Admin Dashboard]
+    WEB[Web App] --> GW[NestJS Application]
+    MOBILE[Mobile App] --> GW
+    ADMIN[Admin Dashboard] --> GW
+
+    subgraph Modules["12 Internal Modules"]
+        IAM[Identity]
+        COACH[Coaching]
+        SCHED[Scheduling]
+        PAY[Payments]
+        PROG[Programs]
+        COMM[Communication]
+        CONT[Content]
+        VIDEO[Video]
+        NOTIF[Notifications]
+        ANALYTICS[Analytics]
+        SEARCH[Search]
+        SUPPORT[Support]
     end
 
-    subgraph "API Layer"
-        GW[NestJS Application]
-    end
+    GW --> Modules
+```
 
-    subgraph "Modular Monolith - NestJS"
-        direction TB
-        IAM[Identity & Access Module]
-        COACH[Coaching Module]
-        SCHED[Scheduling Module]
-        PAY[Payments Module]
-        PROG[Programs Module]
-        COMM[Communication Module]
-        CONT[Content Module]
-        VIDEO[Video Sessions Module]
-        NOTIF[Notifications Module]
-        ANALYTICS[Analytics Module]
-        SEARCH[Search Module]
-        SUPPORT[Support Module]
-    end
+**Data & Async Layers:**
 
-    subgraph "Async Layer"
-        RMQ[RabbitMQ]
-    end
+```mermaid
+graph LR
+    App[NestJS App] --> PG[(PostgreSQL<br/>Schema per Module)]
+    App --> REDIS[(Redis<br/>Cache & Sessions)]
+    App --> RMQ[RabbitMQ]
+    App --> S3[(S3 - Media)]
 
-    subgraph "Data Layer"
-        PG[(PostgreSQL - Schema per Module)]
-        REDIS[(Redis - Cache & Sessions)]
-        ES[(Elasticsearch - Search Index)]
-        S3[(Object Storage - Media)]
-    end
+    RMQ --> NOTIF[Notifications]
+    RMQ --> ANALYTICS[Analytics]
+    RMQ --> SEARCH[Search / ES]
 
-    subgraph "External Services"
-        STRIPE[Stripe]
-        ZOOM[Zoom / Google Meet]
-        EMAIL[SendGrid / SES]
-        PUSH[Firebase Cloud Messaging]
-    end
-
-    WEB --> GW
-    MOBILE --> GW
-    ADMIN --> GW
-
-    GW --- IAM
-    GW --- COACH
-    GW --- SCHED
-    GW --- PAY
-    GW --- PROG
-    GW --- COMM
-    GW --- CONT
-    GW --- VIDEO
-    GW --- NOTIF
-    GW --- ANALYTICS
-    GW --- SEARCH
-    GW --- SUPPORT
-
-    IAM --> PG
-    COACH --> PG
-    SCHED --> PG
-    PAY --> PG
-    PROG --> PG
-    COMM --> PG
-    CONT --> PG
-    VIDEO --> PG
-    NOTIF --> PG
-    ANALYTICS --> PG
-    SEARCH --> ES
-    SUPPORT --> PG
-
-    IAM --> RMQ
-    COACH --> RMQ
-    SCHED --> RMQ
-    PAY --> RMQ
-    PROG --> RMQ
-    COMM --> RMQ
-    VIDEO --> RMQ
-    SUPPORT --> RMQ
-
-    RMQ --> NOTIF
-    RMQ --> ANALYTICS
-    RMQ --> SEARCH
-
-    PAY --> STRIPE
-    VIDEO --> ZOOM
-    NOTIF --> EMAIL
-    NOTIF --> PUSH
-    CONT --> S3
-
-    GW --> REDIS
+    App --> STRIPE[Stripe]
+    App --> ZOOM[Zoom]
+    NOTIF --> EMAIL[SendGrid]
+    NOTIF --> PUSH[FCM]
 ```
 
 ---
@@ -151,111 +98,63 @@ graph TB
 - It leverages essential infrastructure: service discovery, circuit breakers, distributed tracing, saga orchestration.
 - However, the operational overhead is significant and often unjustified for teams smaller than 20-30 engineers.
 
+**Services & Gateway:**
+
 ```mermaid
 graph TB
-    subgraph "Client Layer"
-        WEB[Web App - React/Next.js]
-        MOBILE[Mobile App - React Native]
-        ADMIN[Admin Dashboard]
+    WEB[Web App] --> GW[API Gateway - Kong]
+    MOBILE[Mobile App] --> GW
+    ADMIN[Admin Dashboard] --> GW
+
+    subgraph K8s["Kubernetes Cluster"]
+        SVC_IAM[Identity - NestJS]
+        SVC_COACH[Coaching - NestJS]
+        SVC_SCHED[Scheduling - NestJS]
+        SVC_PAY[Payments - Spring Boot]
+        SVC_PROG[Programs - NestJS]
+        SVC_COMM[Communication - NestJS]
+        SVC_CONT[Content - Go]
+        SVC_VIDEO[Video - NestJS]
+        SVC_NOTIF[Notification - NestJS]
+        SVC_ANALYTICS[Analytics - Python]
+        SVC_SEARCH[Search - Go]
+        SVC_SUPPORT[Support - NestJS]
     end
 
-    subgraph "Infrastructure Layer"
-        APIGW[API Gateway - Kong]
-        SD[Service Discovery - Consul]
-        CB[Circuit Breaker - Resilience4j]
+    GW --> K8s
+```
+
+**Event Streaming & Database-per-Service:**
+
+```mermaid
+graph LR
+    subgraph Producers["Event Producers"]
+        Sched[Scheduling]
+        Pay[Payments]
+        Prog[Programs]
+        Comm[Communication]
     end
 
-    subgraph "Microservices - Kubernetes Cluster"
-        direction TB
-        SVC_IAM[Identity Service - NestJS]
-        SVC_COACH[Coaching Service - NestJS]
-        SVC_SCHED[Scheduling Service - NestJS]
-        SVC_PAY[Payments Service - Spring Boot]
-        SVC_PROG[Programs Service - NestJS]
-        SVC_COMM[Communication Service - NestJS]
-        SVC_CONT[Content Service - Go]
-        SVC_VIDEO[Video Service - NestJS]
-        SVC_NOTIF[Notification Service - NestJS]
-        SVC_ANALYTICS[Analytics Service - Python]
-        SVC_SEARCH[Search Service - Go]
-        SVC_SUPPORT[Support Service - NestJS]
+    KAFKA[Apache Kafka + Schema Registry]
+
+    subgraph Consumers["Event Consumers"]
+        Notif[Notifications]
+        Analytics[Analytics]
+        Search[Search]
     end
 
-    subgraph "Event Streaming"
-        KAFKA[Apache Kafka Cluster]
-        SR[Schema Registry - Avro]
-    end
+    Producers --> KAFKA
+    KAFKA --> Consumers
+```
 
-    subgraph "Data Stores - Each Service Owns Its DB"
-        DB_IAM[(PostgreSQL - Identity)]
-        DB_COACH[(PostgreSQL - Coaching)]
-        DB_SCHED[(PostgreSQL - Scheduling)]
-        DB_PAY[(PostgreSQL - Payments)]
-        DB_PROG[(PostgreSQL - Programs)]
-        DB_COMM[(MongoDB - Communication)]
-        DB_CONT[(S3 + PostgreSQL - Content)]
-        DB_VIDEO[(PostgreSQL - Video)]
-        DB_NOTIF[(PostgreSQL - Notifications)]
-        DB_ANALYTICS[(ClickHouse - Analytics)]
-        DB_SEARCH[(Elasticsearch - Search)]
-        DB_SUPPORT[(PostgreSQL - Support)]
-    end
-
-    subgraph "Observability"
-        JAEGER[Jaeger - Tracing]
-        ELK[ELK Stack - Logging]
-        PROM[Prometheus + Grafana - Metrics]
-    end
-
-    WEB --> APIGW
-    MOBILE --> APIGW
-    ADMIN --> APIGW
-
-    APIGW --> SVC_IAM
-    APIGW --> SVC_COACH
-    APIGW --> SVC_SCHED
-    APIGW --> SVC_PAY
-    APIGW --> SVC_PROG
-    APIGW --> SVC_COMM
-    APIGW --> SVC_CONT
-    APIGW --> SVC_VIDEO
-    APIGW --> SVC_NOTIF
-    APIGW --> SVC_ANALYTICS
-    APIGW --> SVC_SEARCH
-    APIGW --> SVC_SUPPORT
-
-    SVC_IAM --> DB_IAM
-    SVC_COACH --> DB_COACH
-    SVC_SCHED --> DB_SCHED
-    SVC_PAY --> DB_PAY
-    SVC_PROG --> DB_PROG
-    SVC_COMM --> DB_COMM
-    SVC_CONT --> DB_CONT
-    SVC_VIDEO --> DB_VIDEO
-    SVC_NOTIF --> DB_NOTIF
-    SVC_ANALYTICS --> DB_ANALYTICS
-    SVC_SEARCH --> DB_SEARCH
-    SVC_SUPPORT --> DB_SUPPORT
-
-    SVC_IAM --> KAFKA
-    SVC_COACH --> KAFKA
-    SVC_SCHED --> KAFKA
-    SVC_PAY --> KAFKA
-    SVC_PROG --> KAFKA
-    SVC_COMM --> KAFKA
-    SVC_VIDEO --> KAFKA
-    SVC_SUPPORT --> KAFKA
-
-    KAFKA --> SVC_NOTIF
-    KAFKA --> SVC_ANALYTICS
-    KAFKA --> SVC_SEARCH
-
-    KAFKA --> SR
-
-    SVC_IAM --> JAEGER
-    SVC_COACH --> JAEGER
-    SVC_SCHED --> JAEGER
-    SVC_PAY --> JAEGER
+```mermaid
+graph LR
+    Identity[Identity] --> DB1[(PostgreSQL)]
+    Coaching[Coaching] --> DB2[(PostgreSQL)]
+    Scheduling[Scheduling] --> DB3[(PostgreSQL)]
+    Payments[Payments] --> DB4[(PostgreSQL)]
+    Analytics[Analytics] --> DB5[(ClickHouse)]
+    Search[Search] --> DB6[(Elasticsearch)]
 ```
 
 ---

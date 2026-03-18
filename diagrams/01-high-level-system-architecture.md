@@ -1,120 +1,184 @@
-# Diagram 1: High-Level System Architecture (C4 Context)
+# High-Level System Architecture (C4 Context)
 
-This C4-style context diagram shows how external actors (clients, third-party services) interact with the platform's core application boundary. The internal box represents either a single deployable monolith (Approach A) or a set of independently deployed microservices (Approach B). All external dependencies are shown at the edges.
+This section shows how external actors and internal systems interact with the platform. The diagrams are split by concern so each one is readable on its own.
+
+---
+
+## 1A. Request Flow — How Traffic Reaches the Application
 
 ```mermaid
 graph TB
-    subgraph Clients["Client Applications"]
-        WebApp["Web App<br/>(React SPA)"]
-        MobileApp["Mobile App<br/>(React Native)"]
-        CoachDashboard["Coach Dashboard<br/>(Web)"]
+    Web["Web App"]
+    Mobile["Mobile App"]
+    Coach["Coach Dashboard"]
+
+    CDN["CloudFlare CDN"]
+    GW["API Gateway<br/>Kong / AWS API GW"]
+    LB["Load Balancer<br/>NGINX / ALB"]
+
+    App["Core Platform<br/>(Monolith or Microservices)"]
+
+    Web --> CDN
+    Mobile --> CDN
+    Coach --> CDN
+    CDN --> GW
+    Web --> GW
+    Mobile --> GW
+    Coach --> GW
+    GW --> LB
+    LB --> App
+
+    style CDN fill:#fff3e0,stroke:#f57c00
+    style GW fill:#fce4ec,stroke:#c62828
+    style LB fill:#fce4ec,stroke:#c62828
+    style App fill:#e8f5e9,stroke:#2e7d32
+```
+
+---
+
+## 1B. Approach A — Modular Monolith Overview
+
+```mermaid
+graph TB
+    App["NestJS Monolith<br/>12 Modules"]
+    Workers["Background Workers"]
+    RMQ["RabbitMQ"]
+
+    PG["PostgreSQL<br/>Schema per Module"]
+    Redis["Redis<br/>Cache + Sessions"]
+    S3["S3<br/>Media Storage"]
+    ES["Elasticsearch<br/>Search Index"]
+
+    App --> PG
+    App --> Redis
+    App --> S3
+    App --> RMQ
+    RMQ --> Workers
+    Workers --> ES
+
+    style App fill:#e8f5e9,stroke:#2e7d32
+    style Workers fill:#e0f7fa,stroke:#00838f
+    style RMQ fill:#e0f2f1,stroke:#00695c
+    style PG fill:#f3e5f5,stroke:#7b1fa2
+    style Redis fill:#f3e5f5,stroke:#7b1fa2
+    style S3 fill:#f3e5f5,stroke:#7b1fa2
+    style ES fill:#f3e5f5,stroke:#7b1fa2
+```
+
+---
+
+## 1C. Approach B — Microservices Overview
+
+```mermaid
+graph TB
+    GW["API Gateway"]
+
+    subgraph Services["Kubernetes Cluster"]
+        S1["Identity"]
+        S2["Coaching"]
+        S3s["Scheduling"]
+        S4["Payments"]
+        S5["Programs"]
+        S6["Communication"]
     end
 
-    subgraph CDN_Layer["Content Delivery"]
-        CDN["CloudFlare CDN<br/>(Static Assets, Video Cache)"]
+    subgraph Services2["  "]
+        S7["Content"]
+        S8["Video"]
+        S9["Notifications"]
+        S10["Analytics"]
+        S11["Search"]
+        S12["Support"]
     end
 
-    subgraph Gateway_Layer["API Layer"]
-        APIGW["API Gateway<br/>(Kong / AWS API GW)<br/>Rate Limiting, Auth, Routing"]
-        LB["Load Balancer<br/>(NGINX / ALB)"]
-    end
+    Kafka["Apache Kafka"]
 
-    subgraph Core["Core Platform Boundary"]
-        direction TB
-        subgraph AppA["Approach A: Modular Monolith"]
-            Monolith["Single Deployable<br/>12 Bounded Context Modules<br/>(Identity, Coaching, Scheduling,<br/>Payments, Programs, Communication,<br/>Content, Video, Notifications,<br/>Analytics, Search, Support)"]
-            Workers_A["Background Workers<br/>(Async Job Processing)"]
-        end
-        subgraph AppB["Approach B: Microservices"]
-            IdentitySvc["Identity & Access Service"]
-            CoachingSvc["Coaching Service"]
-            SchedulingSvc["Scheduling Service"]
-            PaymentsSvc["Payments Service"]
-            ProgramsSvc["Programs Service"]
-            CommSvc["Communication Service"]
-            ContentSvc["Content Service"]
-            VideoSvc["Video Sessions Service"]
-            NotifSvc["Notifications Service"]
-            AnalyticsSvc["Analytics Service"]
-            SearchSvc["Search Service"]
-            SupportSvc["Support Service"]
-        end
-    end
+    GW --> S1
+    GW --> S2
+    GW --> S3s
+    GW --> S4
+    GW --> S5
+    GW --> S6
+    GW --> S7
+    GW --> S8
 
-    subgraph Messaging["Message Broker"]
-        RabbitMQ["RabbitMQ<br/>(Approach A: Async Queues)"]
-        Kafka["Apache Kafka<br/>(Approach B: Event Streaming)"]
-    end
+    S3s --> Kafka
+    S4 --> Kafka
+    S5 --> Kafka
+    S6 --> Kafka
 
-    subgraph DataStores["Data Stores"]
-        PG["PostgreSQL<br/>(Primary Database)"]
-        Redis["Redis<br/>(Cache, Sessions, Rate Limits)"]
-        S3["S3 / Object Storage<br/>(Videos, Images, Documents)"]
-    end
+    Kafka --> S9
+    Kafka --> S10
+    Kafka --> S11
 
-    subgraph External["External Services"]
-        Auth0["Auth0<br/>(Authentication / OAuth2)"]
-        Stripe["Stripe<br/>(Payment Processing)"]
-        Zoom["Zoom API<br/>(Video Conferencing)"]
-        SendGrid["SendGrid<br/>(Transactional Email)"]
-        Twilio["Twilio<br/>(SMS / Push Notifications)"]
-    end
+    style GW fill:#fce4ec,stroke:#c62828
+    style Services fill:#e8f5e9,stroke:#2e7d32
+    style Services2 fill:#e8f5e9,stroke:#2e7d32
+    style Kafka fill:#e0f2f1,stroke:#00695c
+```
 
-    subgraph Observability["Observability Stack"]
-        Grafana["Grafana<br/>(Dashboards)"]
-        Prometheus["Prometheus<br/>(Metrics)"]
-        Loki["Loki<br/>(Log Aggregation)"]
-        Tempo["Tempo<br/>(Distributed Tracing)"]
-    end
+---
 
-    subgraph AnalyticsPipeline["Analytics Pipeline"]
-        EventCollector["Event Collector"]
-        DataWarehouse["Data Warehouse<br/>(ClickHouse / BigQuery)"]
-        BIDashboard["BI Dashboard"]
-    end
+## 1D. External Services
 
-    WebApp --> CDN
-    MobileApp --> CDN
-    CoachDashboard --> CDN
-    CDN --> APIGW
-    WebApp --> APIGW
-    MobileApp --> APIGW
-    CoachDashboard --> APIGW
-    APIGW --> LB
-    LB --> Core
+```mermaid
+graph LR
+    App["Core Platform"]
 
-    Core --> RabbitMQ
-    Core --> Kafka
-    Core --> PG
-    Core --> Redis
-    Core --> S3
-    Core --> Auth0
-    Core --> Stripe
-    Core --> Zoom
-    Core --> SendGrid
-    Core --> Twilio
+    Auth0["Auth0<br/>Authentication"]
+    Stripe["Stripe<br/>Payments"]
+    Zoom["Zoom API<br/>Video"]
+    SendGrid["SendGrid<br/>Email"]
+    Twilio["Twilio<br/>SMS / Push"]
 
-    RabbitMQ --> Workers_A
-    Kafka --> AppB
+    App --> Auth0
+    App --> Stripe
+    App --> Zoom
+    App --> SendGrid
+    App --> Twilio
 
-    Core --> Prometheus
-    Core --> Loki
-    Core --> Tempo
-    Prometheus --> Grafana
-    Loki --> Grafana
-    Tempo --> Grafana
+    style App fill:#e8f5e9,stroke:#2e7d32
+    style Auth0 fill:#fff8e1,stroke:#f9a825
+    style Stripe fill:#fff8e1,stroke:#f9a825
+    style Zoom fill:#fff8e1,stroke:#f9a825
+    style SendGrid fill:#fff8e1,stroke:#f9a825
+    style Twilio fill:#fff8e1,stroke:#f9a825
+```
 
-    Core --> EventCollector
-    EventCollector --> DataWarehouse
-    DataWarehouse --> BIDashboard
+---
 
-    style Clients fill:#e1f5fe,stroke:#0288d1
-    style CDN_Layer fill:#fff3e0,stroke:#f57c00
-    style Gateway_Layer fill:#fce4ec,stroke:#c62828
-    style Core fill:#e8f5e9,stroke:#2e7d32
-    style DataStores fill:#f3e5f5,stroke:#7b1fa2
-    style External fill:#fff8e1,stroke:#f9a825
-    style Messaging fill:#e0f2f1,stroke:#00695c
-    style Observability fill:#efebe9,stroke:#4e342e
-    style AnalyticsPipeline fill:#e8eaf6,stroke:#283593
+## 1E. Observability & Analytics
+
+```mermaid
+graph LR
+    App["Core Platform"]
+
+    Prom["Prometheus<br/>Metrics"]
+    Loki["Loki<br/>Logs"]
+    Tempo["Tempo<br/>Traces"]
+    Graf["Grafana<br/>Dashboards"]
+
+    Collector["Event Collector"]
+    DW["Data Warehouse<br/>ClickHouse"]
+    BI["BI Dashboard"]
+
+    App --> Prom
+    App --> Loki
+    App --> Tempo
+    Prom --> Graf
+    Loki --> Graf
+    Tempo --> Graf
+
+    App --> Collector
+    Collector --> DW
+    DW --> BI
+
+    style App fill:#e8f5e9,stroke:#2e7d32
+    style Prom fill:#efebe9,stroke:#4e342e
+    style Loki fill:#efebe9,stroke:#4e342e
+    style Tempo fill:#efebe9,stroke:#4e342e
+    style Graf fill:#efebe9,stroke:#4e342e
+    style Collector fill:#e8eaf6,stroke:#283593
+    style DW fill:#e8eaf6,stroke:#283593
+    style BI fill:#e8eaf6,stroke:#283593
 ```

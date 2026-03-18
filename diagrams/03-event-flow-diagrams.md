@@ -1,146 +1,193 @@
-# Diagram 3: Event Flow Diagram
+# Event Flow Diagrams
 
-This sequence diagram shows the three primary event flows through the system. Domain events are the backbone of decoupled communication, whether delivered via RabbitMQ queues (Approach A) or Kafka topics (Approach B).
+Domain events are the backbone of decoupled communication. Each flow below is split into focused diagrams so the interactions are easy to follow.
 
-### Flow 1: Booking and Payment
+---
+
+## Flow 1: Booking and Payment
+
+### 1A. Client Creates Booking (Synchronous)
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant Client as Client App
-    participant APIGW as API Gateway
-    participant Sched as Scheduling Context
-    participant MQ as Message Broker<br/>(RabbitMQ / Kafka)
-    participant Pay as Payments Context
-    participant Stripe as Stripe API
-    participant Notif as Notifications Context
-    participant Email as SendGrid
-    participant Push as Twilio
-    participant Analytics as Analytics Context
-    participant DW as Data Warehouse
+    participant GW as API Gateway
+    participant Sched as Scheduling
+    participant MQ as Message Broker
 
-    Client->>APIGW: POST /bookings (coachId, slot, type)
-    APIGW->>Sched: Route to Scheduling
-    Sched->>Sched: Validate availability & reserve slot
-    Sched-->>MQ: Publish: BookingCreated{bookingId, clientId, coachId, amount}
-
-    MQ-->>Pay: Consume: BookingCreated
-    Pay->>Stripe: Create PaymentIntent
-    Stripe-->>Pay: PaymentIntent confirmed
-    Pay-->>MQ: Publish: PaymentConfirmed{bookingId, paymentId, amount}
-
-    MQ-->>Sched: Consume: PaymentConfirmed
-    Sched->>Sched: Confirm booking status
-
-    MQ-->>Notif: Consume: PaymentConfirmed
-    Notif->>Email: Send confirmation email to client
-    Notif->>Email: Send booking alert to coach
-    Notif->>Push: Send push notification to both
-
-    MQ-->>Analytics: Consume: BookingCreated
-    MQ-->>Analytics: Consume: PaymentConfirmed
-    Analytics->>DW: Store event data
-
-    Note over Sched,Analytics: If payment fails, Scheduling receives<br/>PaymentFailed and releases the slot.
-
-    MQ-->>Sched: (alt) Consume: PaymentFailed
-    Sched->>Sched: (alt) Release reserved slot
-    Sched-->>MQ: (alt) Publish: BookingCancelled
+    Client->>GW: POST /bookings
+    GW->>Sched: Route request
+    Sched->>Sched: Validate availability
+    Sched->>Sched: Reserve time slot
+    Sched-->>MQ: Publish BookingCreated
+    Sched-->>Client: 201 Created
 ```
 
-### Flow 2: Program Enrollment and Progress
+### 1B. Payment Processing (Async)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant MQ as Message Broker
+    participant Pay as Payments
+    participant Stripe as Stripe API
+    participant Sched as Scheduling
+
+    MQ-->>Pay: Consume BookingCreated
+    Pay->>Stripe: Create PaymentIntent
+    Stripe-->>Pay: PaymentIntent confirmed
+    Pay-->>MQ: Publish PaymentConfirmed
+
+    MQ-->>Sched: Consume PaymentConfirmed
+    Sched->>Sched: Confirm booking status
+```
+
+### 1C. Notifications & Analytics React (Async)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant MQ as Message Broker
+    participant Notif as Notifications
+    participant Email as SendGrid
+    participant Push as Twilio
+    participant Analytics as Analytics
+
+    MQ-->>Notif: Consume PaymentConfirmed
+    Notif->>Email: Confirmation to client
+    Notif->>Email: Alert to coach
+    Notif->>Push: Push to both
+
+    MQ-->>Analytics: Consume BookingCreated
+    MQ-->>Analytics: Consume PaymentConfirmed
+    Analytics->>Analytics: Store event data
+```
+
+### 1D. Payment Failure Path
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant MQ as Message Broker
+    participant Sched as Scheduling
+    participant Notif as Notifications
+
+    Note over MQ: PaymentFailed event
+    MQ-->>Sched: Consume PaymentFailed
+    Sched->>Sched: Release reserved slot
+    Sched-->>MQ: Publish BookingCancelled
+
+    MQ-->>Notif: Consume PaymentFailed
+    Notif->>Notif: Send "payment failed" email
+```
+
+---
+
+## Flow 2: Program Enrollment and Progress
+
+### 2A. Coach Creates Program
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant Coach as Coach Dashboard
-    participant APIGW as API Gateway
-    participant Prog as Programs Context
+    participant GW as API Gateway
+    participant Prog as Programs
+    participant Content as Content
     participant MQ as Message Broker
-    participant Coaching as Coaching Context
-    participant Content as Content Context
-    participant Notif as Notifications Context
-    participant Analytics as Analytics Context
-    participant Search as Search Context
 
-    Coach->>APIGW: POST /programs (plan details)
-    APIGW->>Prog: Create program
-    Prog->>Content: Fetch exercise references
+    Coach->>GW: POST /programs
+    GW->>Prog: Create program
+    Prog->>Content: Fetch exercise refs
     Content-->>Prog: Exercise metadata
-    Prog-->>MQ: Publish: ProgramCreated{programId, coachId, exercises}
-
-    MQ-->>Search: Consume: ProgramCreated
-    Search->>Search: Index program for discovery
-
-    MQ-->>Analytics: Consume: ProgramCreated
-    Analytics->>Analytics: Record program creation metric
-
-    Note over Coach,Analytics: Client enrolls in the program
-
-    Coach->>APIGW: POST /programs/{id}/enrollments (clientId)
-    APIGW->>Prog: Enroll client
-    Prog->>Coaching: Validate coach-client relationship
-    Coaching-->>Prog: Relationship confirmed
-    Prog-->>MQ: Publish: EnrollmentStarted{programId, clientId}
-
-    MQ-->>Notif: Consume: EnrollmentStarted
-    Notif->>Notif: Send welcome + program details to client
-
-    Note over Coach,Analytics: Client logs workout progress
-
-    Coach->>APIGW: PUT /programs/{id}/progress (workout log)
-    APIGW->>Prog: Update progress
-    Prog-->>MQ: Publish: ProgressUpdated{programId, clientId, completion%}
-
-    MQ-->>Coaching: Consume: ProgressUpdated
-    Coaching->>Coaching: Update client assessment data
-
-    MQ-->>Notif: Consume: ProgressUpdated
-    Notif->>Notif: Notify coach of client milestone
-
-    MQ-->>Analytics: Consume: ProgressUpdated
-    Analytics->>Analytics: Track engagement metrics
+    Prog-->>MQ: Publish ProgramCreated
 ```
 
-### Flow 3: Communication and Notifications
+### 2B. Client Enrolls
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Coach as Coach Dashboard
+    participant GW as API Gateway
+    participant Prog as Programs
+    participant Coaching as Coaching
+    participant MQ as Message Broker
+
+    Coach->>GW: POST /programs/{id}/enrollments
+    GW->>Prog: Enroll client
+    Prog->>Coaching: Validate relationship
+    Coaching-->>Prog: Confirmed
+    Prog-->>MQ: Publish EnrollmentStarted
+```
+
+### 2C. Progress Tracking (Async Reactions)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Client as Client App
+    participant GW as API Gateway
+    participant Prog as Programs
+    participant MQ as Message Broker
+    participant Coaching as Coaching
+    participant Notif as Notifications
+    participant Analytics as Analytics
+
+    Client->>GW: PUT /programs/{id}/progress
+    GW->>Prog: Update progress
+    Prog-->>MQ: Publish ProgressUpdated
+
+    MQ-->>Coaching: Update assessment data
+    MQ-->>Notif: Notify coach of milestone
+    MQ-->>Analytics: Track engagement
+```
+
+---
+
+## Flow 3: Communication and Notifications
+
+### 3A. Sending a Message
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant User as Client / Coach
-    participant APIGW as API Gateway
-    participant Comm as Communication Context
+    participant GW as API Gateway
+    participant Comm as Communication
     participant MQ as Message Broker
-    participant Notif as Notifications Context
-    participant Email as SendGrid
-    participant SMS as Twilio SMS
-    participant PushSvc as Twilio Push
-    participant Analytics as Analytics Context
 
-    User->>APIGW: POST /messages (recipientId, body, attachments)
-    APIGW->>Comm: Send message
-    Comm->>Comm: Store message, update conversation thread
-    Comm-->>MQ: Publish: MessageSent{messageId, senderId, recipientId, channel}
+    User->>GW: POST /messages
+    GW->>Comm: Send message
+    Comm->>Comm: Store in thread
+    Comm-->>MQ: Publish MessageSent
+```
 
-    MQ-->>Notif: Consume: MessageSent
-    Notif->>Notif: Check recipient notification preferences
+### 3B. Notification Delivery
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant MQ as Message Broker
+    participant Notif as Notifications
+    participant Push as Push Service
+    participant Email as Email Service
+    participant SMS as SMS Service
+
+    MQ-->>Notif: Consume MessageSent
+    Notif->>Notif: Check preferences
 
     alt Recipient is online
-        Notif->>PushSvc: Send in-app push
+        Notif->>Push: In-app push
     else Recipient is offline
-        Notif->>PushSvc: Send mobile push notification
-        Notif->>Email: Send email digest (batched)
+        Notif->>Push: Mobile push
+        Notif->>Email: Email digest
     end
 
-    alt Urgent / flagged message
-        Notif->>SMS: Send SMS alert
+    alt Urgent message
+        Notif->>SMS: SMS alert
     end
 
-    Notif-->>MQ: Publish: NotificationDelivered{notifId, channel, recipientId}
-
-    MQ-->>Analytics: Consume: MessageSent
-    MQ-->>Analytics: Consume: NotificationDelivered
-    Analytics->>Analytics: Track communication engagement
-
-    Note over Comm,Analytics: All events feed into the analytics<br/>pipeline regardless of the delivery outcome.
+    Notif-->>MQ: Publish NotificationDelivered
 ```

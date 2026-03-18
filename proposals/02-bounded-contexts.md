@@ -6,63 +6,64 @@ The platform is decomposed into 12 bounded contexts, each representing a cohesiv
 
 ### Context Map Overview
 
+**Domain Classification:**
+
 ```mermaid
 graph TB
-    subgraph "Core Domain"
+    subgraph Core["Core Domain"]
         COACHING[Coaching]
         PROGRAMS[Programs]
         SCHEDULING[Scheduling]
     end
 
-    subgraph "Supporting Domain"
-        PAYMENTS[Payments]
+    subgraph Supporting["Supporting Domain"]
         COMMUNICATION[Communication]
         VIDEO[Video Sessions]
         CONTENT[Content]
     end
 
-    subgraph "Generic Domain"
+    subgraph Generic["Generic Domain"]
         IDENTITY[Identity & Access]
+        PAYMENTS[Payments]
         NOTIFICATIONS[Notifications]
         ANALYTICS[Analytics]
         SEARCH[Search]
         SUPPORT[Support]
     end
 
-    %% Upstream / Downstream relationships
-    IDENTITY -->|UserRegistered, RoleAssigned| COACHING
-    IDENTITY -->|UserRegistered| NOTIFICATIONS
-    IDENTITY -->|UserRegistered| ANALYTICS
+    style Core fill:#c8e6c9,stroke:#2e7d32
+    style Supporting fill:#bbdefb,stroke:#1565c0
+    style Generic fill:#ffe0b2,stroke:#e65100
+```
 
-    COACHING -->|CoachProfileUpdated, ServiceCreated| SCHEDULING
-    COACHING -->|CoachProfileUpdated| SEARCH
-    COACHING -->|CoachProfileUpdated| ANALYTICS
+**Core Event Flow — Booking & Payment:**
 
-    SCHEDULING -->|BookingCreated, BookingCancelled| PAYMENTS
-    SCHEDULING -->|BookingCreated| VIDEO
-    SCHEDULING -->|BookingCreated, BookingCancelled| NOTIFICATIONS
-    SCHEDULING -->|BookingCreated, BookingCancelled| ANALYTICS
+```mermaid
+graph LR
+    IDENTITY[Identity] -->|UserRegistered| COACHING[Coaching]
+    COACHING -->|ServiceCreated| SCHEDULING[Scheduling]
+    SCHEDULING -->|BookingCreated| PAYMENTS[Payments]
+    PAYMENTS -->|PaymentConfirmed| SCHEDULING
+    SCHEDULING -->|BookingConfirmed| VIDEO[Video Sessions]
+```
 
-    PAYMENTS -->|PaymentConfirmed, PaymentFailed, RefundIssued| SCHEDULING
-    PAYMENTS -->|PaymentConfirmed, PaymentFailed| NOTIFICATIONS
-    PAYMENTS -->|PaymentConfirmed, RefundIssued| ANALYTICS
+**Event Consumers — Notifications, Analytics, Search:**
 
-    PROGRAMS -->|ProgramCreated, ClientEnrolled, MilestoneCompleted| NOTIFICATIONS
-    PROGRAMS -->|ProgramCreated, ClientEnrolled| SEARCH
-    PROGRAMS -->|ProgramCreated, ClientEnrolled, MilestoneCompleted| ANALYTICS
+```mermaid
+graph RL
+    NOTIFICATIONS[Notifications]
+    ANALYTICS[Analytics]
+    SEARCH[Search]
 
-    COMMUNICATION -->|MessageSent, FeedbackReceived| NOTIFICATIONS
-    COMMUNICATION -->|FeedbackReceived| ANALYTICS
-
-    CONTENT -->|ContentPublished| SEARCH
-    CONTENT -->|ContentPublished| NOTIFICATIONS
-    CONTENT -->|ContentPublished| ANALYTICS
-
-    VIDEO -->|SessionStarted, SessionEnded| NOTIFICATIONS
-    VIDEO -->|SessionStarted, SessionEnded| ANALYTICS
-
-    SUPPORT -->|TicketCreated| NOTIFICATIONS
-    SUPPORT -->|TicketCreated| ANALYTICS
+    SCHEDULING[Scheduling] --> NOTIFICATIONS
+    SCHEDULING --> ANALYTICS
+    PAYMENTS[Payments] --> NOTIFICATIONS
+    PAYMENTS --> ANALYTICS
+    PROGRAMS[Programs] --> NOTIFICATIONS
+    PROGRAMS --> ANALYTICS
+    PROGRAMS --> SEARCH
+    COACHING[Coaching] --> SEARCH
+    CONTENT[Content] --> SEARCH
 ```
 
 ---
