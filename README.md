@@ -60,21 +60,3 @@ Deep dives into the 13 core infrastructure components, each covering what it doe
 11. [Notification System](./infrastructure/11-notification-system.md)
 12. [Observability Stack](./infrastructure/12-observability-stack.md)
 13. [Analytics Pipeline](./infrastructure/13-analytics-pipeline.md)
-
-### Presentation
-
-A 55-slide architecture review covering all major topics:
-
-- [presentation.pptx](./presentation.pptx) — PowerPoint format (Google Slides / Keynote compatible)
-- [presentation.html](./presentation.html) — Open in a browser to present (arrow keys to navigate)
-- [presentation.md](./presentation.md) — Marp source (editable)
-- [05-presentation-part1.md](./05-presentation-part1.md) — Slides 1–28 with speaker notes
-- [06-presentation-part2.md](./06-presentation-part2.md) — Slides 29–55 with speaker notes
-
-### Infrastructure Components Presentation
-
-A 30-slide deep dive into every infrastructure component — API Gateway, CDN, Redis, Kafka, PostgreSQL, S3, Auth0, Stripe, and more:
-
-- [infrastructure-presentation.pptx](./infrastructure-presentation.pptx) — PowerPoint format
-- [infrastructure-presentation.html](./infrastructure-presentation.html) — Browser presentation
-- [infrastructure-presentation.md](./infrastructure-presentation.md) — Marp source (editable)
